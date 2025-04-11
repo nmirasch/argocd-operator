@@ -18,6 +18,12 @@ metadata:
   namespace: nmirasch-tenant
 spec:
   params:
+  - name: build-platforms
+    value:
+      - linux/x86_64
+      - linux/arm64
+      - linux/ppc64le
+      - linux/s390x
   - name: git-url
     value: '{{source_url}}'
   - name: revision
@@ -25,7 +31,11 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/nmirasch-tenant/argocd-operator:{{revision}}
   - name: dockerfile
-    value: Dockerfile
+    value: Containerfile.plugin
+  - name: hermetic
+    value: true
+  - name: prefetch-input
+    value: '{"type": "gomod", "path": "."}'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while reducing network traffic.
@@ -226,6 +236,8 @@ spec:
         value: $(params.image-expires-after)
       - name: COMMIT_SHA
         value: $(tasks.clone-repository.results.commit)
+      - name: TARGET_VERSION
+        value: '{{target_branch}}'
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
