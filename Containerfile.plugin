@@ -14,7 +14,7 @@
 #
 # --
 
-FROM registry.access.redhat.com/ubi8/go-toolset:1.22.9-3.1744031965 AS builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.23.6-1 AS builder
 
 ENV LANG=en_US.utf8
 ENV GIT_COMMITTER_NAME devtools
