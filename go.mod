@@ -1,6 +1,8 @@
 module github.com/argoproj-labs/argocd-operator
 
-go 1.22.0
+go 1.23
+
+toolchain go1.23.8
 
 require (
 	// Pin github.com/argoproj/argo-cd/v2 to v2.12.3
@@ -84,7 +86,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20240103051144-eec4567ac022 // indirect
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e // indirect
 	sigs.k8s.io/gateway-api v1.0.0 // indirect
-	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
+	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
@@ -118,7 +120,7 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.28.3
 	k8s.io/sample-cli-plugin => k8s.io/sample-cli-plugin v0.28.3
 	k8s.io/sample-controller => k8s.io/sample-controller v0.28.3
-	sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2
+	sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8
 )
 
 replace k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.28.3
