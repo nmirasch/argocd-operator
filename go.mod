@@ -7,7 +7,7 @@ require (
 	// ref: https://github.com/argoproj-labs/argocd-operator/pull/1606#issuecomment-2490948356
 	github.com/argoproj/argo-cd/v2 v2.12.3
 	github.com/cert-manager/cert-manager v1.14.4
-	github.com/coreos/prometheus-operator v0.40.0
+	github.com/coreos/prometheus-operator v0.81.0
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
 	github.com/json-iterator/go v1.1.12
