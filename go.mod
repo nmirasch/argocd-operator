@@ -1,6 +1,8 @@
 module github.com/argoproj-labs/argocd-operator
 
-go 1.22.0
+go 1.23.0
+
+toolchain go1.23.8
 
 require (
 	// Pin github.com/argoproj/argo-cd/v2 to v2.12.3
@@ -68,7 +70,7 @@ require (
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
+	golang.org/x/oauth2 v0.29.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
