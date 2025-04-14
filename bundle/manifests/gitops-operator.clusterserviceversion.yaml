@@ -191,7 +191,8 @@ metadata:
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
     operatorframework.io/cluster-monitoring: "true"
-    operatorframework.io/suggested-namespace: openshift-gitops-operator
+    #operatorframework.io/suggested-namespace: openshift-gitops-operator
+    operatorframework.io/suggested-namespace: poc-gitops-operator
     operators.openshift.io/infrastructure-features: '["disconnected"]'
     operators.operatorframework.io/builder: operator-sdk-v1.35.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -997,11 +998,12 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: openshift-gitops-operator-controller-manager
+        #serviceAccountName: openshift-gitops-operator-controller-manager
       deployments:
       - label:
           control-plane: gitops-operator
-        name: openshift-gitops-operator-controller-manager
+        #name: openshift-gitops-operator-controller-manager
+        name: poc-gitops-operator-controller-manager
         spec:
           replicas: 1
           selector:
@@ -1090,7 +1092,7 @@ spec:
                   readOnly: true
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: openshift-gitops-operator-controller-manager
+              #serviceAccountName: openshift-gitops-operator-controller-manager
               terminationGracePeriodSeconds: 10
               volumes:
               - name: kube-rbac-proxy-tls
@@ -1129,7 +1131,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: openshift-gitops-operator-controller-manager
+        #serviceAccountName: openshift-gitops-operator-controller-manager
     strategy: deployment
   installModes:
   - supported: false
@@ -1159,7 +1161,8 @@ spec:
     containerPort: 443
     conversionCRDs:
     - argocds.argoproj.io
-    deploymentName: openshift-gitops-operator-controller-manager
+    #deploymentName: openshift-gitops-operator-controller-manager
+    deploymentName: poc-gitops-operator-controller-manager
     generateName: cargocds.kb.io
     sideEffects: None
     targetPort: 9443
