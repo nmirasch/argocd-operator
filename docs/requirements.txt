@@ -1,4 +1,4 @@
-mkdocs==1.3.0
+mkdocs==1.6.1
 # Strict mode has been disabled in latest versions of mkdocs-material.
 # Thus pointing to the older version of mkdocs-material.
 
