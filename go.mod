@@ -123,4 +123,4 @@ replace (
 
 replace k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.28.3
 
-replace cloud.google.com/go => cloud.google.com/go v0.99.0
+replace cloud.google.com/go => cloud.google.com/go v0.120.1
