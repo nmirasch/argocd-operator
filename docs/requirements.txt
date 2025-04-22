@@ -2,7 +2,7 @@ mkdocs==1.6.1
 # Strict mode has been disabled in latest versions of mkdocs-material.
 # Thus pointing to the older version of mkdocs-material.
 
-mkdocs-material==7.3.6
+mkdocs-material==9.6.12
 markdown_include==0.8.1
 
 pygments==2.19.1
