@@ -11,7 +11,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
 	github.com/json-iterator/go v1.1.12
-	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.34.0
 	github.com/openshift/api f636181788a9
 	github.com/openshift/client-go v0.0.0-20200325131901-f7baeb993edb
