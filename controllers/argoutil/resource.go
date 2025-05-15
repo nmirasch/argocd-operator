@@ -174,3 +174,17 @@ func LogResourceAction(log logr.Logger, action string, object metav1.Object, exp
 
 	log.Info(msg)
 }
+
+// AddOperatorWatchedByLabel adds the operator watched by label to the resource
+func AddOperatorWatchedLabel(meta *metav1.ObjectMeta) {
+	if meta.Labels == nil {
+		meta.Labels = make(map[string]string)
+	}
+	meta.Labels[common.OperatorWatchedByLabel] = common.ArgoCDAppName
+}
+
+// IsOperatorManaged checks if the resource is watched by the operator
+func IsOperatorWatched(labels map[string]string) bool {
+	value, exists := labels[common.OperatorWatchedByLabel]
+	return exists && value == common.ArgoCDAppName
+}
