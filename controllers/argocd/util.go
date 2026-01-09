@@ -29,7 +29,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/argoproj/argo-cd/v2/util/glob"
 	"github.com/go-logr/logr"

@@ -35,7 +35,7 @@ import (
 	oappsv1client "github.com/openshift/client-go/apps/clientset/versioned/typed/apps/v1"
 	oauthclient "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
 	templatev1client "github.com/openshift/client-go/template/clientset/versioned/typed/template/v1"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
