@@ -948,6 +948,16 @@ func (r *ReconcileArgoCD) reconcileArgoCmdParamsConfigMap(cr *argoproj.ArgoCD) e
 	const healthPersistKey = "controller.resource.health.persist"
 	cm.Data[healthPersistKey] = "true"
 
+	// TokenRef strict mode uses the upstream argocd-cmd-params-cm key consumed by
+	// ARGOCD_APPLICATIONSET_CONTROLLER_TOKENREF_STRICT_MODE
+	tokenRefStrictModeValue, hasExplicitTokenRefStrictMode := getTokenRefStrictModeCmdParamValue(cr.Spec.CmdParams)
+	if hasExplicitTokenRefStrictMode {
+		cm.Data[common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey] = tokenRefStrictModeValue
+	} else {
+		// Default tokenRef strict mode so only Secrets labeled as SCM credentials can be used with tokenRef.
+		cm.Data[common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey] = "true"
+	}
+
 	// Copy user-specified command parameters if any
 	if len(cr.Spec.CmdParams) > 0 {
 		for k, v := range cr.Spec.CmdParams {
@@ -994,6 +1004,14 @@ func (r *ReconcileArgoCD) reconcileArgoCmdParamsConfigMap(cr *argoproj.ArgoCD) e
 	}
 	argoutil.LogResourceCreation(log, cm)
 	return r.Create(context.TODO(), cm)
+}
+
+func getTokenRefStrictModeCmdParamValue(cmdParams map[string]string) (string, bool) {
+	if len(cmdParams) == 0 {
+		return "", false
+	}
+	val, ok := cmdParams[common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey]
+	return val, ok
 }
 
 type filteredResource struct {

@@ -1791,33 +1791,48 @@ func TestReconcileArgoCD_RemovesLegacyLogEnforceFlag(t *testing.T) {
 func TestReconcileArgoCD_reconcileArgoCmdParamsConfigMap(t *testing.T) {
 	logf.SetLogger(ZapLogger(true))
 
+	strictKey := common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey
+
 	tests := []struct {
-		name           string
-		cmdParams      map[string]string
-		expectedValue  string
-		expectKeyExist bool
+		name                   string
+		cmdParams              map[string]string
+		expectedValue          string
+		expectKeyExist         bool
+		expectedTokenRefStrict string
 	}{
 		{
-			name:           "No user-specified CmdParams",
-			cmdParams:      nil,
-			expectedValue:  "true",
-			expectKeyExist: true,
+			name:                   "No user-specified CmdParams",
+			cmdParams:              nil,
+			expectedValue:          "true",
+			expectKeyExist:         true,
+			expectedTokenRefStrict: "true",
 		},
 		{
 			name: "User-specified CmdParams without health.persist",
 			cmdParams: map[string]string{
 				"some.other.param": "value",
 			},
-			expectedValue:  "true",
-			expectKeyExist: true,
+			expectedValue:          "true",
+			expectKeyExist:         true,
+			expectedTokenRefStrict: "true",
 		},
 		{
 			name: "User overrides health.persist to false",
 			cmdParams: map[string]string{
 				"controller.resource.health.persist": "false",
 			},
-			expectedValue:  "false",
-			expectKeyExist: true,
+			expectedValue:          "false",
+			expectKeyExist:         true,
+			expectedTokenRefStrict: "true",
+		},
+		{
+			name: "User overrides tokenRef strict mode via cmdParams",
+			cmdParams: map[string]string{
+				strictKey: "false",
+			},
+			expectedValue:          "true",
+			expectKeyExist:         true,
+			expectedTokenRefStrict: "false",
 		},
 	}
 
@@ -1845,8 +1860,78 @@ func TestReconcileArgoCD_reconcileArgoCmdParamsConfigMap(t *testing.T) {
 			assert.NoError(t, err)
 
 			val, exists := cm.Data["controller.resource.health.persist"]
-			assert.Equal(t, test.expectKeyExist, exists, "Expected key existence mismatesth")
+			assert.Equal(t, test.expectKeyExist, exists, "Expected key existence mismatch")
 			assert.Equal(t, test.expectedValue, val, "Expected value mismatch")
+
+			strictVal, strictOk := cm.Data[strictKey]
+			assert.True(t, strictOk, "expected %s to be set", strictKey)
+			assert.Equal(t, test.expectedTokenRefStrict, strictVal)
+		})
+	}
+}
+
+func TestReconcileArgoCD_reconcileArgoCmdParamsConfigMap_tokenRefStrictDefault(t *testing.T) {
+	logf.SetLogger(ZapLogger(true))
+
+	key := common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey
+
+	tests := []struct {
+		name              string
+		cmdParams         map[string]string
+		expectStrictValue string
+	}{
+		{
+			name:              "defaults to true when cmdParams is nil",
+			cmdParams:         nil,
+			expectStrictValue: "true",
+		},
+		{
+			name: "defaults to true when cmdParams has no tokenRef key",
+			cmdParams: map[string]string{
+				"some.other.param": "value",
+			},
+			expectStrictValue: "true",
+		},
+		{
+			name: "user sets tokenRef strict mode to false",
+			cmdParams: map[string]string{
+				key: "false",
+			},
+			expectStrictValue: "false",
+		},
+		{
+			name: "user sets tokenRef strict mode to true",
+			cmdParams: map[string]string{
+				key: "true",
+			},
+			expectStrictValue: "true",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := makeTestArgoCD(func(ac *argoproj.ArgoCD) {
+				ac.Spec.CmdParams = tt.cmdParams
+			})
+
+			resObjs := []client.Object{a}
+			subresObjs := []client.Object{a}
+			runtimeObjs := []runtime.Object{}
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
+			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
+
+			err := r.reconcileArgoCmdParamsConfigMap(a)
+			assert.NoError(t, err)
+
+			cm := &corev1.ConfigMap{}
+			err = r.Get(context.TODO(), types.NamespacedName{
+				Name:      common.ArgoCDCmdParamsConfigMapName,
+				Namespace: testNamespace,
+			}, cm)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.expectStrictValue, cm.Data[key])
 		})
 	}
 }

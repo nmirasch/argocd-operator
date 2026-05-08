@@ -15,10 +15,12 @@ import (
 	appprojectFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/appproject"
 	argocdFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/argocd"
 	clusterroleFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/clusterrole"
+	configmapFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/configmap"
 	deploymentFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/deployment"
 	k8sFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/k8s"
 	namespaceFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/namespace"
 	roleFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/role"
+	secretFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/secret"
 	"github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -1324,6 +1326,260 @@ var _ = Describe("GitOps Operator Sequential E2E Tests", func() {
 			By("Cleaning up the ApplicationSet")
 			Expect(k8sClient.Delete(ctx, appset)).To(Succeed())
 			Eventually(appset).Should(k8sFixture.NotExistByName())
+		})
+
+		It("defaults ApplicationSet tokenRef strict mode in cmd params and reconciles drift to true", func() {
+			By("creating namespaces appset-argocd and appset-target-ns")
+			appsetArgocdNS, cleanupFunc := fixture.CreateNamespaceWithCleanupFunc("appset-argocd")
+			cleanupFunctions = append(cleanupFunctions, cleanupFunc)
+
+			targetNS, cleanupFunc := fixture.CreateNamespaceWithCleanupFunc("appset-target-ns")
+			cleanupFunctions = append(cleanupFunctions, cleanupFunc)
+
+			By("creating Argo CD with apps and appset source namespaces configured")
+			argoCD := &v1beta1.ArgoCD{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "tokenref-default-example",
+					Namespace: appsetArgocdNS.Name,
+				},
+				Spec: v1beta1.ArgoCDSpec{
+					SourceNamespaces: []string{
+						targetNS.Name,
+					},
+					ApplicationSet: &v1beta1.ArgoCDApplicationSet{
+						SourceNamespaces: []string{
+							targetNS.Name,
+						},
+						SCMProviders: []string{
+							"github.com",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, argoCD)).To(Succeed())
+			Eventually(argoCD, "5m", "5s").Should(argocdFixture.BeAvailable())
+			Eventually(argoCD).Should(argocdFixture.HaveApplicationSetControllerStatus("Running"))
+
+			By("verifying cmd params configmap defaults tokenRef strict mode to true")
+			cmdParamsCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      common.ArgoCDCmdParamsConfigMapName,
+					Namespace: argoCD.Namespace,
+				},
+			}
+			Eventually(cmdParamsCM).Should(configmapFixture.HaveStringDataKeyValue(common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey, "true"))
+
+			By("verifying appset deployment consumes strict mode from cmd params configmap")
+			appsetDeployment := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "tokenref-default-example-applicationset-controller",
+					Namespace: argoCD.Namespace,
+				},
+			}
+			Eventually(appsetDeployment).Should(k8sFixture.ExistByName())
+			Eventually(func() bool {
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(appsetDeployment), appsetDeployment); err != nil {
+					GinkgoWriter.Println(err)
+					return false
+				}
+				if len(appsetDeployment.Spec.Template.Spec.Containers) == 0 {
+					return false
+				}
+				for _, env := range appsetDeployment.Spec.Template.Spec.Containers[0].Env {
+					if env.Name != common.ArgoCDApplicationSetControllerTokenRefStrictModeEnvName {
+						continue
+					}
+					if env.ValueFrom == nil || env.ValueFrom.ConfigMapKeyRef == nil {
+						return false
+					}
+					return env.ValueFrom.ConfigMapKeyRef.Name == common.ArgoCDCmdParamsConfigMapName &&
+						env.ValueFrom.ConfigMapKeyRef.Key == common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey
+				}
+				return false
+			}).Should(BeTrue())
+
+			By("manually changing cmd params configmap key to false to simulate drift")
+			configmapFixture.Update(cmdParamsCM, func(cm *corev1.ConfigMap) {
+				cm.Data[common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey] = "false"
+			})
+			Eventually(cmdParamsCM).Should(configmapFixture.HaveStringDataKeyValue(common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey, "false"))
+
+			By("triggering reconcile by updating ArgoCD and verifying operator overwrites key back to true")
+			argocdFixture.Update(argoCD, func(ac *v1beta1.ArgoCD) {
+				if ac.Spec.ApplicationSet.Annotations == nil {
+					ac.Spec.ApplicationSet.Annotations = map[string]string{}
+				}
+				ac.Spec.ApplicationSet.Annotations["e2e.argocd-operator/tokenref-strict-drift"] = "true"
+			})
+			Eventually(cmdParamsCM).Should(configmapFixture.HaveStringDataKeyValue(common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey, "true"))
+		})
+
+		It("rejects unlabeled tokenRef secret and allows it after scm-creds label is added", func() {
+			By("creating namespaces appset-argocd and appset-target-ns")
+			appsetArgocdNS, cleanupFunc := fixture.CreateNamespaceWithCleanupFunc("appset-argocd")
+			cleanupFunctions = append(cleanupFunctions, cleanupFunc)
+
+			targetNS, cleanupFunc := fixture.CreateNamespaceWithCleanupFunc("appset-target-ns")
+			cleanupFunctions = append(cleanupFunctions, cleanupFunc)
+
+			By("creating Argo CD with apps and appset source namespaces configured")
+			argoCD := &v1beta1.ArgoCD{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "tokenref-runtime-example",
+					Namespace: appsetArgocdNS.Name,
+				},
+				Spec: v1beta1.ArgoCDSpec{
+					SourceNamespaces: []string{
+						targetNS.Name,
+					},
+					ApplicationSet: &v1beta1.ArgoCDApplicationSet{
+						SourceNamespaces: []string{
+							targetNS.Name,
+						},
+						SCMProviders: []string{
+							"http://fake-scm.appset-target-ns.svc.cluster.local",
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, argoCD)).To(Succeed())
+			Eventually(argoCD, "5m", "5s").Should(argocdFixture.BeAvailable())
+			Eventually(argoCD).Should(argocdFixture.HaveApplicationSetControllerStatus("Running"))
+
+			By("creating unlabeled token secret in target namespace")
+			tokenSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "platform-scm-token",
+					Namespace: targetNS.Name,
+				},
+				StringData: map[string]string{
+					"token": "super-secret-token",
+				},
+			}
+			Expect(k8sClient.Create(ctx, tokenSecret)).To(Succeed())
+
+			By("creating ApplicationSet using SCM generator tokenRef")
+			appSet := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "argoproj.io/v1alpha1",
+					"kind":       "ApplicationSet",
+					"metadata": map[string]interface{}{
+						"name":      "tokenref-strict-appset",
+						"namespace": targetNS.Name,
+					},
+					"spec": map[string]interface{}{
+						"generators": []interface{}{
+							map[string]interface{}{
+								"scmProvider": map[string]interface{}{
+									"gitlab": map[string]interface{}{
+										"api":      "http://fake-scm.appset-target-ns.svc.cluster.local",
+										"group":    "demo",
+										"insecure": true,
+										"tokenRef": map[string]interface{}{
+											"secretName": "platform-scm-token",
+											"key":        "token",
+										},
+									},
+								},
+							},
+						},
+						"template": map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"name": "placeholder-{{repository}}",
+							},
+							"spec": map[string]interface{}{
+								"project": "default",
+								"source": map[string]interface{}{
+									"repoURL":        "https://github.com/argoproj/argocd-example-apps.git",
+									"targetRevision": "HEAD",
+									"path":           "guestbook",
+								},
+								"destination": map[string]interface{}{
+									"server":    "https://kubernetes.default.svc",
+									"namespace": targetNS.Name,
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, appSet)).To(Succeed())
+
+			getErrorOccurredMessage := func() string {
+				current := &unstructured.Unstructured{}
+				current.SetAPIVersion("argoproj.io/v1alpha1")
+				current.SetKind("ApplicationSet")
+				current.SetName("tokenref-strict-appset")
+				current.SetNamespace(targetNS.Name)
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(current), current); err != nil {
+					GinkgoWriter.Println(err)
+					return ""
+				}
+				conditions, found, err := unstructured.NestedSlice(current.Object, "status", "conditions")
+				if err != nil || !found {
+					return ""
+				}
+				for _, cond := range conditions {
+					condMap, ok := cond.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					if condMap["type"] == "ErrorOccurred" {
+						if message, ok := condMap["message"].(string); ok {
+							return message
+						}
+					}
+				}
+				return ""
+			}
+
+			By("verifying strict mode rejects unlabeled tokenRef secret")
+			Eventually(func() string { return getErrorOccurredMessage() }, "2m", "5s").
+				Should(ContainSubstring(`secret must have label "argocd.argoproj.io/secret-type"="scm-creds"`))
+
+			By("labeling secret as scm-creds and verifying label-validation error is gone")
+			secretFixture.Update(tokenSecret, func(s *corev1.Secret) {
+				if s.Labels == nil {
+					s.Labels = map[string]string{}
+				}
+				s.Labels[common.ArgoCDSecretTypeLabel] = "scm-creds"
+			})
+
+			By("waiting until the API reports the scm-creds label on the secret")
+			Eventually(func() string {
+				s := &corev1.Secret{}
+				if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: targetNS.Name, Name: tokenSecret.Name}, s); err != nil {
+					return ""
+				}
+				if s.Labels == nil {
+					return ""
+				}
+				return s.Labels[common.ArgoCDSecretTypeLabel]
+			}, "1m", "2s").Should(Equal("scm-creds"))
+
+			// With a single applicationset-namespaces value, the ApplicationSet controller limits its cache to that
+			// namespace; Secret updates can remain stale until the controller process refreshes. Restart the controller
+			// pod so the next reconcile performs an uncached read of the labeled secret.
+			By("restarting ApplicationSet controller pod so reconciliation observes the secret label change")
+			appsetControllerDepl := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "tokenref-runtime-example-applicationset-controller",
+					Namespace: appsetArgocdNS.Name,
+				},
+			}
+			podList := &corev1.PodList{}
+			Expect(k8sClient.List(ctx, podList, client.InNamespace(appsetArgocdNS.Name), client.MatchingLabels{
+				"app.kubernetes.io/name": "tokenref-runtime-example-applicationset-controller",
+			})).To(Succeed())
+			Expect(podList.Items).NotTo(BeEmpty())
+			for i := range podList.Items {
+				Expect(k8sClient.Delete(ctx, &podList.Items[i])).To(Succeed())
+			}
+			Eventually(appsetControllerDepl, "5m", "5s").Should(deploymentFixture.HaveReadyReplicas(1))
+
+			Eventually(func() string {
+				return getErrorOccurredMessage()
+			}, "3m", "5s").ShouldNot(ContainSubstring(`secret must have label "argocd.argoproj.io/secret-type"="scm-creds"`))
 		})
 
 	})

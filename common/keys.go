@@ -244,6 +244,13 @@ const (
 	// ArgoCDKeyInstallationID is the configuration key for the installation ID.
 	ArgoCDKeyInstallationID = "installationID"
 
+	// ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey is the upstream argocd-cmd-params-cm key.
+	// consumed by ARGOCD_APPLICATIONSET_CONTROLLER_TOKENREF_STRICT_MODE.
+	ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey = "applicationsetcontroller.enable.tokenref.strict.mode"
+
+	// ArgoCDApplicationSetControllerTokenRefStrictModeEnvName is the env variable to enable tokenRef strict mode in the ApplicationSet controller.
+	ArgoCDApplicationSetControllerTokenRefStrictModeEnvName = "ARGOCD_APPLICATIONSET_CONTROLLER_TOKENREF_STRICT_MODE"
+
 	// ArgoCDTrackedByOperatorLabel for resources tracked by the operator
 	ArgoCDTrackedByOperatorLabel = "operator.argoproj.io/tracked-by"
 
